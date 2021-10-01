@@ -2,7 +2,7 @@
 
 namespace Smartwyre.DeveloperTest.Data
 {
-    public class AccountDataStore
+    public class AccountDataStore : IAccountDataStore
     {
         public Account GetAccount(string accountNumber)
         {

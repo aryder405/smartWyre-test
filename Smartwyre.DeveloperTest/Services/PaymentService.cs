@@ -1,71 +1,70 @@
-﻿using Smartwyre.DeveloperTest.Data;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Smartwyre.DeveloperTest.Data;
 using Smartwyre.DeveloperTest.Types;
-using System.Configuration;
 
 namespace Smartwyre.DeveloperTest.Services
 {
     public class PaymentService : IPaymentService
     {
+        private readonly IAccountDataStore _accountRepo;
+
+        public PaymentService(IAccountDataStore accountRepo)
+        {
+            _accountRepo = accountRepo;
+        }
+
         public MakePaymentResult MakePayment(MakePaymentRequest request)
         {
-            var accountDataStoreGetData = new AccountDataStore();
-            Account account = accountDataStoreGetData.GetAccount(request.DebtorAccountNumber);
+            if (request is null)
+            {
+                return new MakePaymentResult { Success = false };
+            }
+
+            var account = _accountRepo.GetAccount(request.DebtorAccountNumber);
+
+            if (!ValidateRequest(request, account))
+            {
+                return new MakePaymentResult { Success = false };
+            }
             
-            var result = new MakePaymentResult();
+            account.Balance -= request.Amount;
 
-            switch (request.PaymentScheme)
+            _accountRepo.UpdateAccount(account);
+
+            return new MakePaymentResult { Success = true };
+        }
+
+        private bool ValidateRequest(MakePaymentRequest request, Account account)
+        {
+            if (account is null)
             {
-                case PaymentScheme.BankToBankTransfer:
-                    if (account == null)
-                    {
-                        result.Success = false;
-                    }
-                    else if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.BankToBankTransfer))
-                    {
-                        result.Success = false;
-                    }
-                    break;
-
-                case PaymentScheme.ExpeditedPayments:
-                    if (account == null)
-                    {
-                        result.Success = false;
-                    }
-                    else if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.ExpeditedPayments))
-                    {
-                        result.Success = false;
-                    }
-                    else if (account.Balance < request.Amount)
-                    {
-                        result.Success = false;
-                    }
-                    break;
-
-                case PaymentScheme.AutomatedPaymentSystem:
-                    if (account == null)
-                    {
-                        result.Success = false;
-                    }
-                    else if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.AutomatedPaymentSystem))
-                    {
-                        result.Success = false;
-                    }
-                    else if (account.Status != AccountStatus.Live)
-                    {
-                        result.Success = false;
-                    }
-                    break;
+                return false;
             }
 
-            if (result.Success)
-            {
-                account.Balance -= request.Amount;
+            var vc = new ValidationContext(request);
 
-                var accountDataStoreUpdateData = new AccountDataStore();
-                accountDataStoreUpdateData.UpdateAccount(account);
+            if (!Validator.TryValidateObject(request, vc, new List<ValidationResult>()))
+            {
+                return false;
             }
 
-            return result;
+            if (request.PaymentScheme != account.AllowedPaymentSchemes)
+            {
+                return false;
+            }
+
+            if (request.PaymentScheme == PaymentScheme.ExpeditedPayments && account.Balance < request.Amount)
+            {
+                return false;
+            }
+
+            if (request.PaymentScheme == PaymentScheme.AutomatedPaymentSystem & account.Status != AccountStatus.Live)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

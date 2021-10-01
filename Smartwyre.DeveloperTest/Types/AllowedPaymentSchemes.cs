@@ -1,9 +1,12 @@
 ﻿namespace Smartwyre.DeveloperTest.Types
 {
+    /// <summary>
+    /// not needed
+    /// </summary>
     public enum AllowedPaymentSchemes
     {
-        ExpeditedPayments = 1 << 0,
-        BankToBankTransfer = 1 << 1,
-        AutomatedPaymentSystem = 1 << 2
+        ExpeditedPayments,
+        BankToBankTransfer,
+        AutomatedPaymentSystem
     }
 }
